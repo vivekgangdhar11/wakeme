@@ -1,20 +1,28 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import TripSetup from './pages/TripSetup';
-import ActiveTrip from './pages/ActiveTrip';
-import TripHistory from './pages/TripHistory';
-import './App.css';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import TripSetup from "./pages/TripSetup";
+import ActiveTrip from "./pages/ActiveTrip";
+import TripHistory from "./pages/TripHistory";
+import Expenses from "./pages/Expenses";
+import Navbar from "./components/Navbar";
+import "./App.css";
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<TripSetup />} />
-        <Route path="/active-trip/:id" element={<ActiveTrip />} />
-        <Route path="/trip-history" element={<TripHistory />} />
-        {/* Catch-all route for 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <div className="app-container">
+        <Navbar />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<TripSetup />} />
+            <Route path="/active-trip/:id" element={<ActiveTrip />} />
+            <Route path="/trip-history" element={<TripHistory />} />
+            <Route path="/expenses" element={<Expenses />} />
+            {/* Catch-all route for 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
+      </div>
     </Router>
   );
 }
@@ -30,4 +38,4 @@ function NotFound() {
   );
 }
 
-export default App
+export default App;

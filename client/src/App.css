@@ -1,3 +1,213 @@
+/* Navbar Styles */
+.navbar {
+  background: linear-gradient(135deg, #2c3e50, #3498db);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.brand-link {
+  color: white;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.brand-link:hover {
+  color: #ecf0f1;
+}
+
+.nav-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav-link {
+  color: #ecf0f1;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .nav-link {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Expenses Page Styles */
+.expenses-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+.expense-form-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.expense-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.expenses-summary {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.2);
+}
+
+.expenses-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.expense-item {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.expense-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.expense-details h3 {
+  margin: 0 0 0.5rem;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.expense-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.category-tag {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.category-tag.transport { background: #e8f5e9; color: #2e7d32; }
+.category-tag.food { background: #fff3e0; color: #f57c00; }
+.category-tag.accommodation { background: #e3f2fd; color: #1976d2; }
+.category-tag.entertainment { background: #f3e5f5; color: #7b1fa2; }
+.category-tag.shopping { background: #e0f2f1; color: #00796b; }
+.category-tag.other { background: #f5f5f5; color: #616161; }
+
+.expense-date {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.expense-amount-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.expense-amount {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.delete-expense {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.delete-expense:hover {
+  background-color: #fde8e8;
+}
+
+.no-expenses {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .expense-form {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-item {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .expense-meta {
+    justify-content: center;
+  }
+
+  .expense-amount-section {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* Global Reset and Base Styles */
 * {
   margin: 0;
@@ -17,6 +227,18 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 2rem;
+  background-color: #f8f9fa;
 }
 
 /* Common Styles */
@@ -69,7 +291,10 @@ body {
 .trip-setup-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .setup-content {
@@ -132,12 +357,14 @@ body {
 
 .map-section {
   flex: 1;
-  min-height: 500px;
+  min-height: 600px;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   position: relative;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  margin: 0 auto;
+  max-width: 1200px;
 }
 
 .map-loading {
@@ -777,7 +1004,10 @@ body {
 .map-container {
   width: 100%;
   height: 100%;
-  min-height: 500px;
+  min-height: 600px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 /* Leaflet Map Styles */
