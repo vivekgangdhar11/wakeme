@@ -224,7 +224,7 @@ const TripHistory = () => {
                   <span className="label">Destination:</span>
                   <span className="value">
                     {trip.destination.placeName || 
-                     formatCoordinates(trip.destination.latitude, trip.destination.longitude)}
+                     formatCoordinates(trip.destination.lat, trip.destination.lng)}
                   </span>
                 </div>
               </div>
@@ -258,18 +258,18 @@ const TripHistory = () => {
               
               <div className="detail-section">
                 <h3>Locations</h3>
-                <p><strong>Starting Point:</strong> {formatCoordinates(selectedTrip.currentLocation.latitude, selectedTrip.currentLocation.longitude)}</p>
+                <p><strong>Starting Point:</strong> {selectedTrip.start ? formatCoordinates(selectedTrip.start.lat, selectedTrip.start.lng) : 'Not available'}</p>
                 <p><strong>Destination:</strong> 
                   {selectedTrip.destination.placeName && (
                     <>
                       {selectedTrip.destination.placeName}<br/>
                       <small style={{ color: '#666', fontWeight: 'normal' }}>
-                        {formatCoordinates(selectedTrip.destination.latitude, selectedTrip.destination.longitude)}
+                        {formatCoordinates(selectedTrip.destination.lat, selectedTrip.destination.lng)}
                       </small>
                     </>
                   )}
                   {!selectedTrip.destination.placeName && (
-                    formatCoordinates(selectedTrip.destination.latitude, selectedTrip.destination.longitude)
+                    formatCoordinates(selectedTrip.destination.lat, selectedTrip.destination.lng)
                   )}
                 </p>
               </div>

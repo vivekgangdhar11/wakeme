@@ -34,6 +34,22 @@ const Navbar = () => {
         >
           Expenses
         </Link>
+        <Link
+          to="/settings"
+          className={`nav-link ${
+            location.pathname === "/settings" ? "active" : ""
+          }`}
+        >
+          Settings
+        </Link>
+        <Link
+          to="/about"
+          className={`nav-link ${
+            location.pathname === "/about" ? "active" : ""
+          }`}
+        >
+          About
+        </Link>
       </div>
     </nav>
   );

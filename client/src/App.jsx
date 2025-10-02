@@ -4,6 +4,8 @@ import TripSetup from "./pages/TripSetup";
 import ActiveTrip from "./pages/ActiveTrip";
 import TripHistory from "./pages/TripHistory";
 import Expenses from "./pages/Expenses";
+import Settings from "./pages/Settings";
+import About from "./pages/About";
 import Navbar from "./components/Navbar";
 import "./App.css";
 
@@ -18,6 +20,8 @@ function App() {
             <Route path="/active-trip/:id" element={<ActiveTrip />} />
             <Route path="/trip-history" element={<TripHistory />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/about" element={<About />} />
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>

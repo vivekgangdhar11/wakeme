@@ -1,9 +1,12 @@
 // Trip service to handle API calls
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'; // Changed from 5000 to 5001
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api'; // Updated to match server port
 
 // Helper function for API requests
 const fetchWithHeaders = async (endpoint, options = {}) => {
   try {
+    console.log(`Making API request to: ${API_URL}${endpoint}`);
+    console.log('Request options:', options);
+    
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers: {
@@ -12,11 +15,17 @@ const fetchWithHeaders = async (endpoint, options = {}) => {
       },
     });
     
+    console.log('Response status:', response.status);
+    
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API error response:', errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
     
-    return await response.json();
+    const jsonResponse = await response.json();
+    console.log('API response:', jsonResponse);
+    return jsonResponse;
   } catch (error) {
     console.error('API request failed:', error);
     throw error;

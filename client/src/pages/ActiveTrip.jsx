@@ -47,9 +47,34 @@ const ActiveTrip = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [settings, setSettings] = useState(null);
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
   const alarmAudioRef = useRef(new Audio("/alarm.mp3"));
+  const alarmTimeoutRef = useRef(null);
+
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("wakeme-settings");
+    if (savedSettings) {
+      const parsedSettings = JSON.parse(savedSettings);
+      setSettings(parsedSettings);
+      // Apply volume setting
+      alarmAudioRef.current.volume = parsedSettings.alarmVolume || 0.8;
+    } else {
+      // Default settings
+      const defaultSettings = {
+        alarmVolume: 0.8,
+        vibrateEnabled: true,
+        autoStopAlarm: false,
+        autoStopDuration: 30,
+        highAccuracy: true,
+      };
+      setSettings(defaultSettings);
+      alarmAudioRef.current.volume = 0.8;
+    }
+  }, []);
 
   // Fetch trip data
   useEffect(() => {
@@ -121,16 +146,46 @@ const ActiveTrip = () => {
             trip.destination.lng
           );
 
-          if (distance <= trip.radius) {
+          if (distance <= trip.radiusMeters) {
             if (!isAlarmTriggered) {
               setIsAlarmTriggered(true);
-              audio.play();
+              
+              // Play alarm sound
+              audio.play().catch(console.error);
+              
+              // Vibrate if enabled and supported
+              if (settings?.vibrateEnabled && navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+              }
+              
+              // Show browser notification if enabled
+              if (settings?.notificationsEnabled && Notification.permission === "granted") {
+                new Notification("WakeMe Alert!", {
+                  body: `You're approaching your destination: ${trip.title}`,
+                  icon: "/vite.svg",
+                  tag: "wakeme-alarm"
+                });
+              }
+              
+              // Auto-stop alarm if enabled
+              if (settings?.autoStopAlarm) {
+                alarmTimeoutRef.current = setTimeout(() => {
+                  handleStopAlarm();
+                }, (settings.autoStopDuration || 30) * 1000);
+              }
+              
               await tripService.addLocationPoint(id, newLocation);
             }
           } else if (isAlarmTriggered) {
             setIsAlarmTriggered(false);
             audio.pause();
             audio.currentTime = 0;
+            
+            // Clear auto-stop timeout
+            if (alarmTimeoutRef.current) {
+              clearTimeout(alarmTimeoutRef.current);
+              alarmTimeoutRef.current = null;
+            }
           }
 
           // Periodically save location points (every 30 seconds)
@@ -145,7 +200,7 @@ const ActiveTrip = () => {
           );
         },
         {
-          enableHighAccuracy: true,
+          enableHighAccuracy: settings?.highAccuracy !== false,
           maximumAge: 10000,
           timeout: 15000,
         }
@@ -203,8 +258,8 @@ const ActiveTrip = () => {
     const distance = calculateDistance(
       currentLocation.latitude,
       currentLocation.longitude,
-      trip.destination.latitude,
-      trip.destination.longitude
+      trip.destination.lat,
+      trip.destination.lng
     );
 
     if (distance < 1) {
@@ -219,7 +274,23 @@ const ActiveTrip = () => {
       setIsAlarmTriggered(false);
       alarmAudioRef.current.pause();
       alarmAudioRef.current.currentTime = 0;
+      
+      // Clear auto-stop timeout
+      if (alarmTimeoutRef.current) {
+        clearTimeout(alarmTimeoutRef.current);
+        alarmTimeoutRef.current = null;
+      }
+      
+      // Stop vibration
+      if (navigator.vibrate) {
+        navigator.vibrate(0);
+      }
     }
+  };
+
+  // Toggle fullscreen map
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
   };
 
   // End trip
@@ -288,13 +359,20 @@ const ActiveTrip = () => {
   }
 
   return (
-    <div className="active-trip-container">
-      <div className="trip-header">
-        <h1 className="page-title">{trip.title}</h1>
-        <button className="end-trip-btn" onClick={handleEndTrip}>
-          End Trip
-        </button>
-      </div>
+    <div className={`active-trip-container ${isFullscreen ? 'fullscreen' : ''}`}>
+      {!isFullscreen && (
+        <div className="trip-header">
+          <h1 className="page-title">{trip.title}</h1>
+          <div className="header-buttons">
+            <button className="fullscreen-btn" onClick={toggleFullscreen}>
+              🗺️ Fullscreen Map
+            </button>
+            <button className="end-trip-btn" onClick={handleEndTrip}>
+              End Trip
+            </button>
+          </div>
+        </div>
+      )}
 
       {isAlarmTriggered && (
         <div className="alarm-notification">
@@ -306,50 +384,57 @@ const ActiveTrip = () => {
         </div>
       )}
 
-      <div className="trip-info">
-        <div className="info-item">
-          <span className="label">Started At:</span>
-          <span className="value">{formatDate(trip.createdAt)}</span>
+      {!isFullscreen && (
+        <div className="trip-info">
+          <div className="info-item">
+            <span className="label">Started At:</span>
+            <span className="value">{formatDate(trip.createdAt)}</span>
+          </div>
+          <div className="info-item">
+            <span className="label">Elapsed Time:</span>
+            <span className="value">{formatTimeElapsed(timeElapsed)}</span>
+          </div>
+          <div className="info-item">
+            <span className="label">Current Location:</span>
+            <span className="value">
+              {currentLocation
+                ? formatCoordinates(
+                    currentLocation.latitude,
+                    currentLocation.longitude
+                  )
+                : "Locating..."}
+            </span>
+          </div>
+          <div className="info-item">
+            <span className="label">Destination:</span>
+            <span className="value">
+              {formatCoordinates(trip.destination.lat, trip.destination.lng)}
+            </span>
+          </div>
+          <div
+            className={`info-item ${isAlarmTriggered ? "alarm-triggered" : ""}`}
+          >
+            <span className="label">Distance to Destination:</span>
+            <span className="value">{getDistanceToDestination()}</span>
+          </div>
+          <div className="info-item">
+            <span className="label">Alert Radius:</span>
+            <span className="value">{trip.radiusMeters} meters</span>
+          </div>
         </div>
-        <div className="info-item">
-          <span className="label">Elapsed Time:</span>
-          <span className="value">{formatTimeElapsed(timeElapsed)}</span>
-        </div>
-        <div className="info-item">
-          <span className="label">Current Location:</span>
-          <span className="value">
-            {currentLocation
-              ? formatCoordinates(
-                  currentLocation.latitude,
-                  currentLocation.longitude
-                )
-              : "Locating..."}
-          </span>
-        </div>
-        <div className="info-item">
-          <span className="label">Destination:</span>
-          <span className="value">
-            {formatCoordinates(trip.destination.lat, trip.destination.lng)}
-          </span>
-        </div>
-        <div
-          className={`info-item ${isAlarmTriggered ? "alarm-triggered" : ""}`}
-        >
-          <span className="label">Distance to Destination:</span>
-          <span className="value">{getDistanceToDestination()}</span>
-        </div>
-        <div className="info-item">
-          <span className="label">Alert Radius:</span>
-          <span className="value">{trip.radiusMeters} meters</span>
-        </div>
-      </div>
+      )}
 
-      <div className="map-section">
+      <div className={`map-section ${isFullscreen ? 'fullscreen' : ''}`}>
+        {isFullscreen && (
+          <button className="fullscreen-toggle" onClick={toggleFullscreen}>
+            ❌ Exit Fullscreen
+          </button>
+        )}
         {currentLocation && (
           <MapContainer
             center={[currentLocation.latitude, currentLocation.longitude]}
-            zoom={15}
-            className="map-container"
+            zoom={isFullscreen ? 16 : 15}
+            className={`map-container ${isFullscreen ? 'fullscreen' : ''}`}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
