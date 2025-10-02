@@ -131,10 +131,10 @@ function TripSetup() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       checkDistance,
       (error) => console.error("Error watching position:", error),
-      { 
+      {
         enableHighAccuracy: settings?.highAccuracy !== false,
         maximumAge: 10000,
-        timeout: 15000
+        timeout: 15000,
       }
     );
 
@@ -235,7 +235,10 @@ function TripSetup() {
 
       const tripData = {
         title: tripTitle,
-        start: currentLocation,
+        start: {
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+        },
         destination: {
           lat: destination.lat,
           lng: destination.lng,
@@ -245,7 +248,13 @@ function TripSetup() {
         etaOffsetMinutes: etaOffset,
       };
 
+      console.log("Sending trip data:", tripData);
       const createdTrip = await tripService.createTrip(tripData);
+      console.log("Created trip:", createdTrip);
+
+      if (!createdTrip._id) {
+        throw new Error("Trip created but no ID returned");
+      }
 
       // Redirect to active trip page
       navigate(`/active-trip/${createdTrip._id}`);
@@ -264,7 +273,7 @@ function TripSetup() {
           <h1 className="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Wake-Me-Up Alarm
           </h1>
-          
+
           <div className="grid lg:grid-cols-2 gap-8">
             {/* Map Section */}
             <div className="relative">
@@ -273,7 +282,9 @@ function TripSetup() {
                   <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600 font-medium">Loading map...</p>
+                      <p className="text-gray-600 font-medium">
+                        Loading map...
+                      </p>
                     </div>
                   </div>
                 )}
@@ -290,7 +301,9 @@ function TripSetup() {
                     <MapEvents onLocationSet={setDestination} />
 
                     {/* Current location marker */}
-                    <Marker position={[currentLocation.lat, currentLocation.lng]}>
+                    <Marker
+                      position={[currentLocation.lat, currentLocation.lng]}
+                    >
                       <Popup>Your Location</Popup>
                     </Marker>
 
@@ -298,7 +311,9 @@ function TripSetup() {
                     {destination && (
                       <>
                         <Marker position={[destination.lat, destination.lng]}>
-                          <Popup>{destination.placeName || "Destination"}</Popup>
+                          <Popup>
+                            {destination.placeName || "Destination"}
+                          </Popup>
                         </Marker>
                         <Circle
                           center={[destination.lat, destination.lng]}
@@ -319,23 +334,36 @@ function TripSetup() {
 
             {/* Form Section */}
             <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Set Up Your Trip</h2>
-              
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+                Set Up Your Trip
+              </h2>
+
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3 animate-pulse-ring">
                   <div className="flex-shrink-0">
-                    <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    <svg
+                      className="w-5 h-5 text-red-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </div>
                   <p className="text-red-700 font-medium">{error}</p>
                 </div>
               )}
-              
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Trip Title */}
                 <div className="space-y-2">
-                  <label htmlFor="trip-title" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="trip-title"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Trip Title
                   </label>
                   <input
@@ -351,7 +379,10 @@ function TripSetup() {
 
                 {/* Destination Search */}
                 <div className="space-y-2" ref={searchContainerRef}>
-                  <label htmlFor="destination-search" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="destination-search"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Search for Destination
                   </label>
                   <div className="relative">
@@ -394,7 +425,9 @@ function TripSetup() {
                           className="px-4 py-3 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
                           onClick={() => handleSelectSearchResult(result)}
                         >
-                          <p className="text-gray-800 text-sm">{result.display_name}</p>
+                          <p className="text-gray-800 text-sm">
+                            {result.display_name}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -409,9 +442,12 @@ function TripSetup() {
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                     {destination ? (
                       <div className="space-y-1">
-                        <p className="font-medium text-gray-900">{destination.placeName}</p>
+                        <p className="font-medium text-gray-900">
+                          {destination.placeName}
+                        </p>
                         <p className="text-sm text-gray-500">
-                          {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
+                          {destination.lat.toFixed(6)},{" "}
+                          {destination.lng.toFixed(6)}
                         </p>
                       </div>
                     ) : (
@@ -424,8 +460,14 @@ function TripSetup() {
 
                 {/* Wake-up Radius */}
                 <div className="space-y-3">
-                  <label htmlFor="radius" className="block text-sm font-medium text-gray-700">
-                    Wake-up Radius: <span className="font-semibold text-blue-600">{radius} meters</span>
+                  <label
+                    htmlFor="radius"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Wake-up Radius:{" "}
+                    <span className="font-semibold text-blue-600">
+                      {radius} meters
+                    </span>
                   </label>
                   <input
                     type="range"
@@ -446,8 +488,14 @@ function TripSetup() {
 
                 {/* ETA Offset */}
                 <div className="space-y-3">
-                  <label htmlFor="eta-offset" className="block text-sm font-medium text-gray-700">
-                    ETA Offset: <span className="font-semibold text-blue-600">{etaOffset} minutes</span>
+                  <label
+                    htmlFor="eta-offset"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    ETA Offset:{" "}
+                    <span className="font-semibold text-blue-600">
+                      {etaOffset} minutes
+                    </span>
                   </label>
                   <input
                     type="range"
@@ -472,8 +520,8 @@ function TripSetup() {
                   disabled={loading || !destination}
                   className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 transform ${
                     loading || !destination
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105 hover:shadow-lg active:scale-95 ring-4 ring-blue-200/50 hover:ring-blue-300/70'
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105 hover:shadow-lg active:scale-95 ring-4 ring-blue-200/50 hover:ring-blue-300/70"
                   }`}
                 >
                   {loading ? (
@@ -482,15 +530,15 @@ function TripSetup() {
                       <span>Creating Trip...</span>
                     </span>
                   ) : (
-                    'Start Trip'
+                    "Start Trip"
                   )}
                 </button>
               </form>
 
               {/* Trip History Link */}
               <div className="text-center pt-4">
-                <a 
-                  href="/trip-history" 
+                <a
+                  href="/trip-history"
                   className="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 hover:underline"
                 >
                   View Past Trips
@@ -500,7 +548,7 @@ function TripSetup() {
           </div>
         </div>
       </div>
-      
+
       {/* Alarm Active Overlay */}
       {isAlarmActive && (
         <div className="fixed inset-0 z-50 bg-red-600 flex items-center justify-center animate-pulse-ring">
@@ -508,7 +556,7 @@ function TripSetup() {
             <h2 className="text-3xl font-bold mb-6 animate-bounce-soft">
               🚨 Wake up! You're near your destination! 🚨
             </h2>
-            <button 
+            <button
               onClick={handleStopAlarm}
               className="px-8 py-4 bg-white text-red-600 font-bold rounded-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg"
             >
