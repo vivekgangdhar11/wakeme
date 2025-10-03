@@ -54,12 +54,22 @@ function TripSetup() {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isAlarmActive, setIsAlarmActive] = useState(false);
-  const alarmAudioRef = useRef(new Audio("/alarm.mp3"));
+  const [isTripActive, setIsTripActive] = useState(false);
+  const [distanceToDestination, setDistanceToDestination] = useState(null);
+
+  const mapRef = useRef(null);
+  const alarmAudioRef = useRef(null);
   const watchIdRef = useRef(null);
   const searchContainerRef = useRef(null);
+  const alarmVibrateRef = useRef(null);
 
   // Load settings and initialize location on component mount
   useEffect(() => {
+    // Initialize audio with wind-up clock sound
+    alarmAudioRef.current = new Audio("/wind-up-clock-alarm-bell-64219.mp3");
+    alarmAudioRef.current.loop = true; // Enable looping
+    alarmAudioRef.current.preload = "auto";
+
     // Load settings
     const savedSettings = localStorage.getItem("wakeme-settings");
     if (savedSettings) {
@@ -78,6 +88,35 @@ function TripSetup() {
       alarmAudioRef.current.volume = 0.8;
     }
 
+    // Load the audio file
+    alarmAudioRef.current.load();
+
+    // Check for existing trip
+    const savedTrip = localStorage.getItem("current-trip");
+    if (savedTrip) {
+      const tripData = JSON.parse(savedTrip);
+      setTripTitle(tripData.title);
+      setDestination(tripData.destination);
+      setRadius(tripData.radiusMeters);
+      setEtaOffset(tripData.etaOffsetMinutes);
+      setIsTripActive(true);
+    }
+
+    // Cleanup
+    return () => {
+      if (alarmAudioRef.current) {
+        alarmAudioRef.current.pause();
+        alarmAudioRef.current = null;
+      }
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
+
+  // Initialize location
+  useEffect(() => {
     const initLocation = async () => {
       try {
         setLoading(true);
@@ -94,11 +133,26 @@ function TripSetup() {
     initLocation();
   }, []);
 
-  // Start monitoring location when destination is set
+  // Start monitoring location when trip is active
   useEffect(() => {
-    if (!destination || !currentLocation) return;
+    if (!isTripActive || !destination || !currentLocation) return;
 
     const audio = alarmAudioRef.current;
+
+    // Function to calculate distance using Haversine formula
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371000; // Earth's radius in meters
+      const φ1 = (lat1 * Math.PI) / 180;
+      const φ2 = (lat2 * Math.PI) / 180;
+      const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+      const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+      const a =
+        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
 
     // Function to check distance and trigger alarm
     const checkDistance = (position) => {
@@ -107,23 +161,60 @@ function TripSetup() {
         lng: position.coords.longitude,
       };
 
-      if (
-        isWithinRadius(
-          userLocation.lat,
-          userLocation.lng,
-          destination.lat,
-          destination.lng,
-          radius
-        )
-      ) {
+      // Update current location marker
+      if (mapRef.current) {
+        setCurrentLocation(userLocation);
+      }
+
+      // Calculate distance to destination
+      const distance = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        destination.lat,
+        destination.lng
+      );
+      setDistanceToDestination(distance);
+
+      // Check if within radius and trigger alarm
+      if (distance <= radius) {
         if (!isAlarmActive) {
           setIsAlarmActive(true);
-          audio.play();
+          // Try to play the alarm with loop
+          audio.loop = true;
+          audio.play().catch((error) => {
+            console.error("Failed to play alarm:", error);
+            // If autoplay is blocked, try again after user interaction with the stop button
+            if (error.name === "NotAllowedError") {
+              audio
+                .play()
+                .catch((e) => console.error("Second play attempt failed:", e));
+            }
+          });
+
+          // Vibrate if supported (will loop)
+          if (navigator.vibrate && settings?.vibrateEnabled) {
+            const vibrateInterval = setInterval(() => {
+              navigator.vibrate([200, 100, 200]);
+            }, 1000);
+            // Store the interval ID for cleanup
+            alarmVibrateRef.current = vibrateInterval;
+          }
+
+          // Show notification
+          if (
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            new Notification("Wake Up!", {
+              body: "You're near your destination!",
+              icon: "/vite.svg",
+              requireInteraction: true, // Keep notification until user interacts
+            });
+          }
         }
       } else if (isAlarmActive) {
         setIsAlarmActive(false);
-        audio.pause();
-        audio.currentTime = 0;
+        handleStopAlarm(); // Use the centralized stop function
       }
     };
 
@@ -213,28 +304,83 @@ function TripSetup() {
 
   // Handle stopping the alarm
   const handleStopAlarm = () => {
-    if (isAlarmActive) {
-      setIsAlarmActive(false);
+    if (alarmAudioRef.current) {
       alarmAudioRef.current.pause();
       alarmAudioRef.current.currentTime = 0;
     }
+
+    // Stop vibration
+    if (alarmVibrateRef.current) {
+      clearInterval(alarmVibrateRef.current);
+      alarmVibrateRef.current = null;
+      if (navigator.vibrate) {
+        navigator.vibrate(0); // Stop any ongoing vibration
+      }
+    }
+
+    setIsAlarmActive(false);
+  };
+
+  // Handle stopping the trip
+  const handleStopTrip = (e) => {
+    e.preventDefault();
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    // Save completed trip to history
+    const currentTrip = JSON.parse(localStorage.getItem("current-trip"));
+    if (currentTrip) {
+      const completedTrip = {
+        ...currentTrip,
+        endTime: new Date().toISOString(),
+        _id: Date.now().toString(), // Generate a unique ID
+        createdAt: currentTrip.startTime,
+        endedAt: new Date().toISOString(),
+      };
+
+      // Get existing trips from history
+      const existingTrips = JSON.parse(
+        localStorage.getItem("trip-history") || "[]"
+      );
+
+      // Add new trip to history
+      existingTrips.push(completedTrip);
+      localStorage.setItem("trip-history", JSON.stringify(existingTrips));
+    }
+
+    setIsTripActive(false);
+    handleStopAlarm();
+    localStorage.removeItem("current-trip");
   };
 
   // Handle trip submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!tripTitle || !destination) {
-      setError("Please provide a trip title and select a destination");
+    if (!destination) {
+      setError("Please select a destination");
       return;
     }
 
     try {
+      // Request notification permission if not granted
+      if ("Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+
       setLoading(true);
       setError("");
 
+      // Start trip tracking
+      setIsTripActive(true);
+
+      // Store trip data in localStorage
       const tripData = {
-        title: tripTitle,
+        title:
+          tripTitle ||
+          "Trip to " + (destination.placeName || "Selected Location"),
         start: {
           lat: currentLocation.lat,
           lng: currentLocation.lng,
@@ -246,22 +392,16 @@ function TripSetup() {
         },
         radiusMeters: radius,
         etaOffsetMinutes: etaOffset,
+        startTime: new Date().toISOString(),
       };
 
-      console.log("Sending trip data:", tripData);
-      const createdTrip = await tripService.createTrip(tripData);
-      console.log("Created trip:", createdTrip);
+      localStorage.setItem("current-trip", JSON.stringify(tripData));
+      console.log("Trip tracking started:", tripData);
 
-      if (!createdTrip._id) {
-        throw new Error("Trip created but no ID returned");
-      }
-
-      // Redirect to active trip page
-      navigate(`/active-trip/${createdTrip._id}`);
+      setLoading(false);
     } catch (err) {
-      setError("Failed to create trip: " + (err.message || "Unknown error"));
+      setError("Failed to start trip: " + (err.message || "Unknown error"));
       console.error(err);
-    } finally {
       setLoading(false);
     }
   };
@@ -514,21 +654,38 @@ function TripSetup() {
                   </div>
                 </div>
 
+                {/* Distance Display */}
+                {isTripActive && distanceToDestination !== null && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-blue-800 font-medium">
+                      Distance to destination:{" "}
+                      {Math.round(distanceToDestination)} meters
+                    </p>
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={loading || !destination}
+                  disabled={loading || (!destination && !isTripActive)}
                   className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 transform ${
-                    loading || !destination
+                    loading || (!destination && !isTripActive)
                       ? "bg-gray-400 cursor-not-allowed"
+                      : isTripActive
+                      ? "bg-red-600 hover:bg-red-700 hover:scale-105 hover:shadow-lg active:scale-95 ring-4 ring-red-200/50 hover:ring-red-300/70"
                       : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105 hover:shadow-lg active:scale-95 ring-4 ring-blue-200/50 hover:ring-blue-300/70"
                   }`}
+                  onClick={isTripActive ? handleStopTrip : undefined}
                 >
                   {loading ? (
                     <span className="flex items-center justify-center space-x-2">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Creating Trip...</span>
+                      <span>
+                        {isTripActive ? "Stopping Trip..." : "Starting Trip..."}
+                      </span>
                     </span>
+                  ) : isTripActive ? (
+                    "Stop Trip"
                   ) : (
                     "Start Trip"
                   )}
@@ -549,20 +706,16 @@ function TripSetup() {
         </div>
       </div>
 
-      {/* Alarm Active Overlay */}
+      {/* Alarm Stop Button Overlay */}
       {isAlarmActive && (
-        <div className="fixed inset-0 z-50 bg-red-600 flex items-center justify-center animate-pulse-ring">
-          <div className="text-center text-white p-8 rounded-2xl bg-red-700/90 backdrop-blur-lg shadow-2xl ring-4 ring-white/30">
-            <h2 className="text-3xl font-bold mb-6 animate-bounce-soft">
-              🚨 Wake up! You're near your destination! 🚨
-            </h2>
-            <button
-              onClick={handleStopAlarm}
-              className="px-8 py-4 bg-white text-red-600 font-bold rounded-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg"
-            >
-              Stop Alarm
-            </button>
-          </div>
+        <div className="fixed bottom-8 right-8 z-50">
+          <button
+            onClick={handleStopAlarm}
+            className="px-6 py-4 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg flex items-center space-x-2"
+          >
+            <span>🔕</span>
+            <span>Stop Alarm</span>
+          </button>
         </div>
       )}
     </div>

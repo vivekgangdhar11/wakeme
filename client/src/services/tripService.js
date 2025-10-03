@@ -1,6 +1,6 @@
 // Trip service to handle API calls
 const getApiUrl = async () => {
-  const ports = [5001, 5002, 5003]; // Potential ports
+  const ports = [5001, 5002, 5003, 50021]; // Potential ports
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost";
 
   // Try each port
@@ -21,11 +21,17 @@ let API_URL = null;
 
 // Helper function for API requests
 const fetchWithHeaders = async (endpoint, options = {}) => {
-  // Get API URL if not already set
-  if (!API_URL) {
-    API_URL = await getApiUrl();
-  }
   try {
+    // Get API URL if not already set
+    if (!API_URL) {
+      try {
+        API_URL = await getApiUrl();
+      } catch (error) {
+        console.log("Using localStorage fallback");
+        return handleLocalStorage(endpoint, options);
+      }
+    }
+
     console.log(`Making API request to: ${API_URL}${endpoint}`);
     console.log("Request options:", options);
 
@@ -56,8 +62,30 @@ const fetchWithHeaders = async (endpoint, options = {}) => {
     return jsonResponse;
   } catch (error) {
     console.error("API request failed:", error);
-    throw error;
+    return handleLocalStorage(endpoint, options);
   }
+};
+
+// Handle localStorage operations when API is not available
+const handleLocalStorage = (endpoint, options = {}) => {
+  const method = options.method || "GET";
+
+  // Get all trips
+  if (endpoint === "/trips" && method === "GET") {
+    const trips = JSON.parse(localStorage.getItem("trip-history") || "[]");
+    return Promise.resolve(trips);
+  }
+
+  // Delete trip
+  if (endpoint.startsWith("/trips/") && method === "DELETE") {
+    const tripId = endpoint.split("/")[2];
+    const trips = JSON.parse(localStorage.getItem("trip-history") || "[]");
+    const updatedTrips = trips.filter((trip) => trip._id !== tripId);
+    localStorage.setItem("trip-history", JSON.stringify(updatedTrips));
+    return Promise.resolve({ success: true });
+  }
+
+  return Promise.resolve(null);
 };
 
 // Trip service object with all methods

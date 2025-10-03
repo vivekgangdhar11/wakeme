@@ -12,8 +12,86 @@ const Settings = () => {
   const [highAccuracy, setHighAccuracy] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [testPlaying, setTestPlaying] = useState(false);
-  
-  const audioRef = useRef(new Audio("/alarm.mp3"));
+  const [error, setError] = useState("");
+  const [isAudioLoaded, setIsAudioLoaded] = useState(false);
+
+  const audioRef = useRef(null);
+
+  const audioSource = "/wind-up-clock-alarm-bell-64219.mp3";
+
+  // Initialize audio on mount
+  useEffect(() => {
+    const loadAudio = () => {
+      try {
+        // Create new Audio instance
+        audioRef.current = new Audio();
+        audioRef.current.preload = "auto";
+        audioRef.current.loop = false;
+
+        // Add error handling
+        const handleError = async (event) => {
+          const error = event.target.error;
+          let errorMessage = "Failed to load alarm sound";
+
+          if (error) {
+            switch (error.code) {
+              case MediaError.MEDIA_ERR_ABORTED:
+                errorMessage = "Audio loading aborted";
+                break;
+              case MediaError.MEDIA_ERR_NETWORK:
+                errorMessage = "Network error while loading audio";
+                break;
+              case MediaError.MEDIA_ERR_DECODE:
+                errorMessage = "Audio decoding failed";
+                break;
+              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                errorMessage = "Audio format not supported";
+                break;
+            }
+          }
+
+          console.error("Audio error:", errorMessage, error);
+          setError(errorMessage);
+          setIsAudioLoaded(false);
+        };
+
+        const handleCanPlayThrough = () => {
+          setIsAudioLoaded(true);
+          setError("");
+        };
+
+        // Add event listeners
+        audioRef.current.addEventListener("error", handleError);
+        audioRef.current.addEventListener(
+          "canplaythrough",
+          handleCanPlayThrough
+        );
+
+        // Set source to wind-up clock alarm
+        audioRef.current.src = audioSource;
+        audioRef.current.load();
+
+        // Return cleanup function
+        return () => {
+          if (audioRef.current) {
+            audioRef.current.removeEventListener("error", handleError);
+            audioRef.current.removeEventListener(
+              "canplaythrough",
+              handleCanPlayThrough
+            );
+            audioRef.current.src = "";
+            audioRef.current = null;
+          }
+        };
+      } catch (err) {
+        console.error("Audio initialization error:", err);
+        setError("Failed to initialize audio: " + err.message);
+        return () => {};
+      }
+    };
+
+    return loadAudio();
+  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -63,20 +141,50 @@ const Settings = () => {
     audioRef.current.volume = alarmVolume;
   }, [alarmVolume]);
 
-  const testAlarm = () => {
+  const testAlarm = async () => {
+    if (!isAudioLoaded) {
+      setError("Audio is not ready yet. Please wait.");
+      return;
+    }
+
     if (testPlaying) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setTestPlaying(false);
-    } else {
-      audioRef.current.play();
-      setTestPlaying(true);
-      // Auto-stop after 3 seconds for testing
-      setTimeout(() => {
+      try {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
         setTestPlaying(false);
-      }, 3000);
+      } catch (error) {
+        console.error("Failed to stop alarm:", error);
+        setError("Failed to stop alarm: " + error.message);
+      }
+    } else {
+      try {
+        setError(""); // Clear any previous errors
+        await audioRef.current.play();
+        setTestPlaying(true);
+
+        // Vibrate if enabled
+        if (vibrateEnabled && navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
+
+        // Auto-stop after 3 seconds for testing
+        setTimeout(() => {
+          if (audioRef.current && testPlaying) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setTestPlaying(false);
+          }
+        }, 3000);
+      } catch (error) {
+        console.error("Failed to play alarm:", error);
+        if (error.name === "NotAllowedError") {
+          setError(
+            "Browser blocked auto-play. Please click the Test Alarm button."
+          );
+        } else {
+          setError("Failed to play alarm: " + error.message);
+        }
+      }
     }
   };
 
@@ -89,7 +197,7 @@ const Settings = () => {
 
   const resetToDefaults = () => {
     setAlarmVolume(0.8);
-    setAlarmTone("default");
+    setAlarmTone("windup");
     setVibrateEnabled(true);
     setNotificationsEnabled(true);
     setAutoStopAlarm(false);
@@ -107,7 +215,7 @@ const Settings = () => {
         {/* Alarm Settings */}
         <div className="settings-section">
           <h2>🔔 Alarm Settings</h2>
-          
+
           <div className="setting-item">
             <label>
               <span>Alarm Volume</span>
@@ -121,31 +229,32 @@ const Settings = () => {
                   onChange={(e) => setAlarmVolume(Number(e.target.value))}
                   className="volume-slider"
                 />
-                <span className="volume-value">{Math.round(alarmVolume * 100)}%</span>
+                <span className="volume-value">
+                  {Math.round(alarmVolume * 100)}%
+                </span>
               </div>
             </label>
           </div>
 
           <div className="setting-item">
-            <label>
-              <span>Alarm Tone</span>
-              <select
-                value={alarmTone}
-                onChange={(e) => setAlarmTone(e.target.value)}
-                className="select-input"
-              >
-                <option value="default">Default Alarm</option>
-                <option value="gentle">Gentle Wake</option>
-                <option value="urgent">Urgent Alert</option>
-                <option value="chime">Chime</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="setting-item">
-            <button onClick={testAlarm} className="test-alarm-btn">
-              {testPlaying ? "⏹️ Stop Test" : "🔊 Test Alarm"}
+            <button
+              onClick={testAlarm}
+              className={`test-alarm-btn ${
+                !isAudioLoaded ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={!isAudioLoaded}
+            >
+              {testPlaying
+                ? "⏹️ Stop Test"
+                : isAudioLoaded
+                ? "🔊 Test Alarm"
+                : "⌛ Loading..."}
             </button>
+            {error && (
+              <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                {error}
+              </div>
+            )}
           </div>
 
           <div className="setting-item">
@@ -192,7 +301,7 @@ const Settings = () => {
         {/* Notification Settings */}
         <div className="settings-section">
           <h2>📱 Notification Settings</h2>
-          
+
           <div className="setting-item">
             <label className="checkbox-label">
               <input
@@ -203,7 +312,7 @@ const Settings = () => {
               <span>Enable Browser Notifications</span>
             </label>
             {!notificationsEnabled && (
-              <button 
+              <button
                 onClick={requestNotificationPermission}
                 className="permission-btn"
               >
@@ -216,7 +325,7 @@ const Settings = () => {
         {/* Location Settings */}
         <div className="settings-section">
           <h2>📍 Location Settings</h2>
-          
+
           <div className="setting-item">
             <label>
               <span>Default Wake-up Radius</span>
@@ -250,7 +359,7 @@ const Settings = () => {
         {/* Appearance Settings */}
         <div className="settings-section">
           <h2>🎨 Appearance</h2>
-          
+
           <div className="setting-item">
             <label className="checkbox-label">
               <input
@@ -266,12 +375,12 @@ const Settings = () => {
         {/* Data & Privacy */}
         <div className="settings-section">
           <h2>🔒 Data & Privacy</h2>
-          
+
           <div className="setting-item">
             <p className="info-text">
-              WakeMe only stores trip data and your preferences locally. 
-              Location data is only used during active trips and is not 
-              shared with third parties.
+              WakeMe only stores trip data and your preferences locally.
+              Location data is only used during active trips and is not shared
+              with third parties.
             </p>
           </div>
         </div>
@@ -279,7 +388,7 @@ const Settings = () => {
         {/* Reset Settings */}
         <div className="settings-section">
           <h2>🔄 Reset</h2>
-          
+
           <div className="setting-item">
             <button onClick={resetToDefaults} className="reset-btn">
               Reset to Defaults
